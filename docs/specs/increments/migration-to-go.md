@@ -1,11 +1,12 @@
 # Master Spec - migration-to-go
 
-**Status**: `awaiting-human-plan-approval`
+**Status**: `implemented`
 **Fecha**: 2026-05-31
 **Owner**: cristiansrc
 **Proyecto**: `hv-go-ms-resume`
 **Incremento**: `migration-to-go`
 **Tipo**: Migración + nuevas funcionalidades
+**Implementado**: 2026-06-01
 
 ---
 

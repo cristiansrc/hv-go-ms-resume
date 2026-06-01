@@ -1,8 +1,9 @@
 # Task Board - migration-to-go
 
-**Status**: `done`
+**Status**: `implemented`
 **Incremento**: `migration-to-go`
 **Fecha**: 2026-06-01
+**Implementado**: 2026-06-01
 
 ---
 
