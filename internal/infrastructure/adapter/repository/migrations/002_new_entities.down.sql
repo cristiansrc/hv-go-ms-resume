@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS custom_section;
+DROP TABLE IF EXISTS reference;
+DROP TABLE IF EXISTS language;
+DROP TABLE IF EXISTS certification;
+DROP TABLE IF EXISTS course;

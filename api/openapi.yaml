@@ -1,0 +1,3859 @@
+openapi: 3.1.0
+info:
+  title: hv-go-ms-resume API
+  description: |
+    Microservicio REST para gestionar la información del portfolio personal y CV.
+    Migración de Spring Boot a Go 1.22+ con arquitectura hexagonal.
+
+    - Endpoints `/public/*` y `/login`: sin autenticación
+    - Endpoints CRUD: requieren JWT Bearer Token
+    - Rate limiting aplicado en todos los endpoints
+  version: 2.0.0
+  contact:
+    name: cristiansrc
+    url: https://cristiansrc.com
+    email: contacto@cristiansrc.com
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+  - url: https://api.cristiansrc.com
+    description: Producción
+
+paths:
+  # ==================== AUTHENTICATION ====================
+  /v1/ms-resume/login:
+    post:
+      operationId: login
+      summary: Autenticar usuario y obtener token JWT
+      description: Genera un token JWT para el administrador si las credenciales y Altcha son válidos.
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+
+  # ==================== PUBLIC ENDPOINTS ====================
+  /v1/ms-resume/public/info-page:
+    get:
+      operationId: getInfoPage
+      summary: Obtener información completa de la página
+      description: Retorna Home, BasicData, Skills (lista plana), Experiences, Educations y Altcha Challenge.
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Información completa obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoPageResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/curriculum/{language}:
+    get:
+      operationId: downloadCurriculum
+      summary: Descargar curriculum en PDF
+      description: Genera o retorna desde caché el CV en formato PDF.
+      tags:
+        - Public
+      security: []
+      parameters:
+        - name: language
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - english
+              - spanish
+          description: Idioma del curriculum
+        - name: template
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - engineeringclassic
+              - engineeringresumes
+              - moderncv
+              - sb2nov
+            default: engineeringclassic
+          description: Template de diseño del PDF
+      responses:
+        "200":
+          description: PDF generado exitosamente
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: "attachment; filename=curriculum.pdf"
+            Content-Type:
+              schema:
+                type: string
+              description: application/pdf
+            Content-Length:
+              schema:
+                type: integer
+              description: Tamaño del archivo en bytes
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /v1/ms-resume/public/contact:
+    post:
+      operationId: sendContactMessage
+      summary: Enviar mensaje de contacto
+      description: Recibe un mensaje de contacto y notifica vía Telegram Bot.
+      tags:
+        - Public
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactRequest"
+      responses:
+        "200":
+          description: Mensaje enviado exitosamente
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /v1/ms-resume/public/challenge:
+    get:
+      operationId: getAltchaChallenge
+      summary: Obtener challenge de Altcha
+      description: Genera un nuevo challenge para validación anti-spam.
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Challenge generado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AltchaChallengeResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/blog:
+    get:
+      operationId: getPublicBlogPage
+      summary: Obtener artículos del blog con paginación
+      description: Lista paginada de artículos del blog tecnológico.
+      tags:
+        - Public
+      security: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Número de página (base 0)
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Elementos por página
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "id,desc"
+          description: "Campo y dirección (ej: id,desc)"
+      responses:
+        "200":
+          description: Lista paginada obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/blog/{id}:
+    get:
+      operationId: getPublicBlogById
+      summary: Obtener artículo del blog por ID
+      tags:
+        - Public
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Artículo obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/blog-type:
+    get:
+      operationId: getPublicBlogTypes
+      summary: Obtener todos los tipos de blog
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de tipos obtenida
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogTypeResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/blog-type/{id}:
+    get:
+      operationId: getPublicBlogTypeById
+      summary: Obtener tipo de blog por ID
+      tags:
+        - Public
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Tipo obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogTypeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/templates:
+    get:
+      operationId: getAvailableTemplates
+      summary: Listar templates disponibles para PDF
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplatesResponse"
+
+  /v1/ms-resume/public/languages:
+    get:
+      operationId: getAvailableLanguages
+      summary: Listar idiomas disponibles para PDF
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de idiomas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LanguagesResponse"
+
+  /v1/ms-resume/public/courses:
+    get:
+      operationId: getPublicCourses
+      summary: Listar cursos (solo lectura)
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de cursos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/certifications:
+    get:
+      operationId: getPublicCertifications
+      summary: Listar certificaciones (solo lectura)
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de certificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CertificationResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/languages-data:
+    get:
+      operationId: getPublicLanguagesData
+      summary: Listar idiomas del CV (solo lectura)
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de idiomas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LanguageResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/references:
+    get:
+      operationId: getPublicReferences
+      summary: Listar referencias profesionales (solo lectura)
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de referencias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferenceResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/public/custom-sections:
+    get:
+      operationId: getPublicCustomSections
+      summary: Listar secciones personalizadas visibles (solo lectura)
+      tags:
+        - Public
+      security: []
+      responses:
+        "200":
+          description: Lista de secciones custom visibles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomSectionResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== BASIC DATA ====================
+  /v1/ms-resume/basic-data/{id}:
+    get:
+      operationId: getBasicData
+      summary: Obtener datos básicos por ID
+      tags:
+        - Basic Data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Datos básicos obtenidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicDataResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateBasicData
+      summary: Actualizar datos básicos
+      tags:
+        - Basic Data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BasicDataRequest"
+      responses:
+        "204":
+          description: Datos actualizados
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== HOME ====================
+  /v1/ms-resume/home/{id}:
+    get:
+      operationId: getHome
+      summary: Obtener configuración del home
+      tags:
+        - Home
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Home obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateHome
+      summary: Actualizar configuración del home
+      tags:
+        - Home
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HomeRequest"
+      responses:
+        "204":
+          description: Home actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== LABEL ====================
+  /v1/ms-resume/label:
+    get:
+      operationId: getAllLabels
+      summary: Obtener todas las etiquetas
+      tags:
+        - Label
+      responses:
+        "200":
+          description: Lista de etiquetas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LabelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createLabel
+      summary: Crear nueva etiqueta
+      tags:
+        - Label
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabelRequest"
+      responses:
+        "201":
+          description: Etiqueta creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/label/{id}:
+    get:
+      operationId: getLabelById
+      summary: Obtener etiqueta por ID
+      tags:
+        - Label
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Etiqueta obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LabelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateLabel
+      summary: Actualizar etiqueta
+      tags:
+        - Label
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabelRequest"
+      responses:
+        "204":
+          description: Etiqueta actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteLabel
+      summary: Eliminar etiqueta (soft delete)
+      tags:
+        - Label
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Etiqueta eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== IMAGE URL ====================
+  /v1/ms-resume/image-url:
+    get:
+      operationId: getAllImageUrls
+      summary: Obtener todas las URLs de imágenes
+      tags:
+        - Image URL
+      responses:
+        "200":
+          description: Lista de URLs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImageUrlResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createImageUrl
+      summary: Crear nueva URL de imagen
+      tags:
+        - Image URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageUrlRequest"
+      responses:
+        "201":
+          description: URL creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/image-url/{id}:
+    get:
+      operationId: getImageUrlById
+      summary: Obtener URL de imagen por ID
+      tags:
+        - Image URL
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: URL obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageUrlResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteImageUrl
+      summary: Eliminar URL de imagen (soft delete)
+      tags:
+        - Image URL
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: URL eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== VIDEO URL ====================
+  /v1/ms-resume/video-url:
+    get:
+      operationId: getAllVideoUrls
+      summary: Obtener todas las URLs de videos
+      tags:
+        - Video URL
+      responses:
+        "200":
+          description: Lista de URLs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VideoUrlResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createVideoUrl
+      summary: Crear nueva URL de video
+      tags:
+        - Video URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoUrlRequest"
+      responses:
+        "201":
+          description: URL creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/video-url/{id}:
+    get:
+      operationId: getVideoUrlById
+      summary: Obtener URL de video por ID
+      tags:
+        - Video URL
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: URL obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoUrlResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteVideoUrl
+      summary: Eliminar URL de video (soft delete)
+      tags:
+        - Video URL
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: URL eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== BLOG ====================
+  /v1/ms-resume/blog:
+    get:
+      operationId: getBlogPage
+      summary: Obtener artículos del blog con paginación
+      tags:
+        - Blog
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "id,desc"
+      responses:
+        "200":
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createBlog
+      summary: Crear nuevo artículo del blog
+      tags:
+        - Blog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogRequest"
+      responses:
+        "201":
+          description: Artículo creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/blog/{id}:
+    get:
+      operationId: getBlogById
+      summary: Obtener artículo del blog por ID
+      tags:
+        - Blog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Artículo obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateBlog
+      summary: Actualizar artículo del blog
+      tags:
+        - Blog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogRequest"
+      responses:
+        "204":
+          description: Artículo actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteBlog
+      summary: Eliminar artículo del blog (soft delete)
+      tags:
+        - Blog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Artículo eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== BLOG TYPE ====================
+  /v1/ms-resume/blog-type:
+    get:
+      operationId: getAllBlogTypes
+      summary: Obtener todos los tipos de blog
+      tags:
+        - Blog Type
+      responses:
+        "200":
+          description: Lista de tipos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogTypeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createBlogType
+      summary: Crear nuevo tipo de blog
+      tags:
+        - Blog Type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogTypeRequest"
+      responses:
+        "201":
+          description: Tipo creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/blog-type/{id}:
+    get:
+      operationId: getBlogTypeById
+      summary: Obtener tipo de blog por ID
+      tags:
+        - Blog Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Tipo obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogTypeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateBlogType
+      summary: Actualizar tipo de blog
+      tags:
+        - Blog Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogTypeRequest"
+      responses:
+        "204":
+          description: Tipo actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteBlogType
+      summary: Eliminar tipo de blog (soft delete)
+      tags:
+        - Blog Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Tipo eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== SKILL TYPE ====================
+  /v1/ms-resume/skill-type:
+    get:
+      operationId: getAllSkillTypes
+      summary: Obtener todos los tipos de habilidades
+      tags:
+        - Skill Type
+      responses:
+        "200":
+          description: Lista de tipos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkillTypeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createSkillType
+      summary: Crear nuevo tipo de habilidad
+      tags:
+        - Skill Type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillTypeRequest"
+      responses:
+        "201":
+          description: Tipo creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/skill-type/{id}:
+    get:
+      operationId: getSkillTypeById
+      summary: Obtener tipo de habilidad por ID
+      tags:
+        - Skill Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Tipo obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillTypeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateSkillType
+      summary: Actualizar tipo de habilidad
+      tags:
+        - Skill Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillTypeRequest"
+      responses:
+        "204":
+          description: Tipo actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteSkillType
+      summary: Eliminar tipo de habilidad (soft delete)
+      tags:
+        - Skill Type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Tipo eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== SKILL ====================
+  /v1/ms-resume/skill:
+    get:
+      operationId: getAllSkills
+      summary: Obtener todas las habilidades
+      tags:
+        - Skill
+      responses:
+        "200":
+          description: Lista de habilidades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkillResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createSkill
+      summary: Crear nueva habilidad
+      tags:
+        - Skill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillRequest"
+      responses:
+        "201":
+          description: Habilidad creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/skill/{id}:
+    get:
+      operationId: getSkillById
+      summary: Obtener habilidad por ID
+      tags:
+        - Skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Habilidad obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateSkill
+      summary: Actualizar habilidad
+      tags:
+        - Skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillRequest"
+      responses:
+        "204":
+          description: Habilidad actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteSkill
+      summary: Eliminar habilidad (soft delete)
+      tags:
+        - Skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Habilidad eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== SKILL SON ====================
+  /v1/ms-resume/skill-son:
+    get:
+      operationId: getAllSkillSons
+      summary: Obtener todas las especializaciones
+      tags:
+        - Skill Son
+      responses:
+        "200":
+          description: Lista de especializaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkillSonResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createSkillSon
+      summary: Crear nueva especialización
+      tags:
+        - Skill Son
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillSonRequest"
+      responses:
+        "201":
+          description: Especialización creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/skill-son/{id}:
+    get:
+      operationId: getSkillSonById
+      summary: Obtener especialización por ID
+      tags:
+        - Skill Son
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Especialización obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillSonResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateSkillSon
+      summary: Actualizar especialización
+      tags:
+        - Skill Son
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillSonRequest"
+      responses:
+        "204":
+          description: Especialización actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteSkillSon
+      summary: Eliminar especialización (soft delete)
+      tags:
+        - Skill Son
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Especialización eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== EXPERIENCE ====================
+  /v1/ms-resume/experience:
+    get:
+      operationId: getAllExperiences
+      summary: Obtener todas las experiencias laborales
+      tags:
+        - Experience
+      responses:
+        "200":
+          description: Lista de experiencias (ordenadas por year_start DESC)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExperienceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createExperience
+      summary: Crear nueva experiencia laboral
+      tags:
+        - Experience
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperienceRequest"
+      responses:
+        "201":
+          description: Experiencia creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/experience/{id}:
+    get:
+      operationId: getExperienceById
+      summary: Obtener experiencia laboral por ID
+      tags:
+        - Experience
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Experiencia obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperienceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateExperience
+      summary: Actualizar experiencia laboral
+      tags:
+        - Experience
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperienceRequest"
+      responses:
+        "204":
+          description: Experiencia actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteExperience
+      summary: Eliminar experiencia (soft delete)
+      tags:
+        - Experience
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Experiencia eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== EDUCATION ====================
+  /v1/ms-resume/education:
+    get:
+      operationId: getAllEducations
+      summary: Obtener todas las educaciones
+      tags:
+        - Education
+      responses:
+        "200":
+          description: Lista de educaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EducationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createEducation
+      summary: Crear nueva educación
+      tags:
+        - Education
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EducationRequest"
+      responses:
+        "201":
+          description: Educación creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/education/{id}:
+    get:
+      operationId: getEducationById
+      summary: Obtener educación por ID
+      tags:
+        - Education
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Educación obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EducationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateEducation
+      summary: Actualizar educación
+      tags:
+        - Education
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EducationRequest"
+      responses:
+        "204":
+          description: Educación actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteEducation
+      summary: Eliminar educación (soft delete)
+      tags:
+        - Education
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Educación eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== FEATURED PROJECT ====================
+  /v1/ms-resume/futured-project:
+    get:
+      operationId: getAllFuturedProjects
+      summary: Obtener todos los proyectos destacados
+      tags:
+        - Futured Project
+      responses:
+        "200":
+          description: Lista de proyectos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FuturedProjectResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createFuturedProject
+      summary: Crear nuevo proyecto destacado
+      tags:
+        - Futured Project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FuturedProjectRequest"
+      responses:
+        "201":
+          description: Proyecto creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/futured-project/{id}:
+    get:
+      operationId: getFuturedProjectById
+      summary: Obtener proyecto destacado por ID
+      tags:
+        - Futured Project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Proyecto obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FuturedProjectResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateFuturedProject
+      summary: Actualizar proyecto destacado
+      tags:
+        - Futured Project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FuturedProjectRequest"
+      responses:
+        "204":
+          description: Proyecto actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteFuturedProject
+      summary: Eliminar proyecto destacado (soft delete)
+      tags:
+        - Futured Project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Proyecto eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== COURSE (NEW) ====================
+  /v1/ms-resume/course:
+    get:
+      operationId: getAllCourses
+      summary: Obtener todos los cursos
+      tags:
+        - Course
+      responses:
+        "200":
+          description: Lista de cursos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createCourse
+      summary: Crear nuevo curso
+      tags:
+        - Course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseRequest"
+      responses:
+        "201":
+          description: Curso creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/course/{id}:
+    get:
+      operationId: getCourseById
+      summary: Obtener curso por ID
+      tags:
+        - Course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Curso obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateCourse
+      summary: Actualizar curso
+      tags:
+        - Course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseRequest"
+      responses:
+        "204":
+          description: Curso actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteCourse
+      summary: Eliminar curso (soft delete)
+      tags:
+        - Course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Curso eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== CERTIFICATION (NEW) ====================
+  /v1/ms-resume/certification:
+    get:
+      operationId: getAllCertifications
+      summary: Obtener todas las certificaciones
+      tags:
+        - Certification
+      responses:
+        "200":
+          description: Lista de certificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CertificationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createCertification
+      summary: Crear nueva certificación
+      tags:
+        - Certification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertificationRequest"
+      responses:
+        "201":
+          description: Certificación creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/certification/{id}:
+    get:
+      operationId: getCertificationById
+      summary: Obtener certificación por ID
+      tags:
+        - Certification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Certificación obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateCertification
+      summary: Actualizar certificación
+      tags:
+        - Certification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertificationRequest"
+      responses:
+        "204":
+          description: Certificación actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteCertification
+      summary: Eliminar certificación (soft delete)
+      tags:
+        - Certification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Certificación eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== LANGUAGE (NEW) ====================
+  /v1/ms-resume/language:
+    get:
+      operationId: getAllLanguages
+      summary: Obtener todos los idiomas del CV
+      tags:
+        - Language
+      responses:
+        "200":
+          description: Lista de idiomas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LanguageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createLanguage
+      summary: Crear nuevo idioma
+      tags:
+        - Language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LanguageRequest"
+      responses:
+        "201":
+          description: Idioma creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/language/{id}:
+    get:
+      operationId: getLanguageById
+      summary: Obtener idioma por ID
+      tags:
+        - Language
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Idioma obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LanguageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateLanguage
+      summary: Actualizar idioma
+      tags:
+        - Language
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LanguageRequest"
+      responses:
+        "204":
+          description: Idioma actualizado
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteLanguage
+      summary: Eliminar idioma (soft delete)
+      tags:
+        - Language
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Idioma eliminado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== REFERENCE (NEW) ====================
+  /v1/ms-resume/reference:
+    get:
+      operationId: getAllReferences
+      summary: Obtener todas las referencias profesionales
+      tags:
+        - Reference
+      responses:
+        "200":
+          description: Lista de referencias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createReference
+      summary: Crear nueva referencia profesional
+      tags:
+        - Reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReferenceRequest"
+      responses:
+        "201":
+          description: Referencia creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/reference/{id}:
+    get:
+      operationId: getReferenceById
+      summary: Obtener referencia por ID
+      tags:
+        - Reference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Referencia obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateReference
+      summary: Actualizar referencia
+      tags:
+        - Reference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReferenceRequest"
+      responses:
+        "204":
+          description: Referencia actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteReference
+      summary: Eliminar referencia (soft delete)
+      tags:
+        - Reference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Referencia eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== CUSTOM SECTION (NEW) ====================
+  /v1/ms-resume/custom-section:
+    get:
+      operationId: getAllCustomSections
+      summary: Obtener todas las secciones personalizadas
+      tags:
+        - Custom Section
+      responses:
+        "200":
+          description: Lista de secciones custom
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomSectionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createCustomSection
+      summary: Crear nueva sección personalizada
+      tags:
+        - Custom Section
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomSectionRequest"
+      responses:
+        "201":
+          description: Sección creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/ms-resume/custom-section/{id}:
+    get:
+      operationId: getCustomSectionById
+      summary: Obtener sección personalizada por ID
+      tags:
+        - Custom Section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Sección obtenida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomSectionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: updateCustomSection
+      summary: Actualizar sección personalizada
+      tags:
+        - Custom Section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomSectionRequest"
+      responses:
+        "204":
+          description: Sección actualizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteCustomSection
+      summary: Eliminar sección personalizada (soft delete)
+      tags:
+        - Custom Section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Sección eliminada
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==================== HEALTH ====================
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check del servicio
+      tags:
+        - Operational
+      security: []
+      responses:
+        "200":
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+components:
+  schemas:
+    # ==================== AUTH SCHEMAS ====================
+    LoginRequest:
+      type: object
+      required:
+        - user
+        - password
+        - altcha
+      properties:
+        user:
+          type: string
+          description: Nombre de usuario
+        password:
+          type: string
+          description: Contraseña
+        altcha:
+          type: string
+          description: Respuesta del challenge Altcha
+
+    LoginResponse:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: JWT Bearer Token (validez 24 horas)
+
+    # ==================== PUBLIC SCHEMAS ====================
+    ContactRequest:
+      type: object
+      required:
+        - name
+        - email
+        - message
+        - altcha
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        altcha:
+          type: string
+          description: Respuesta del challenge Altcha
+
+    AltchaChallengeResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+          example: "SHA-256"
+        challenge:
+          type: string
+        salt:
+          type: string
+        signature:
+          type: string
+
+    TemplatesResponse:
+      type: object
+      required:
+        - templates
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateItem"
+
+    TemplateItem:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          enum:
+            - engineeringclassic
+            - engineeringresumes
+            - moderncv
+            - sb2nov
+        name:
+          type: string
+
+    LanguagesResponse:
+      type: object
+      required:
+        - languages
+      properties:
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/LanguageItem"
+
+    LanguageItem:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          enum:
+            - english
+            - spanish
+        name:
+          type: string
+
+    # ==================== EXISTING ENTITY SCHEMAS ====================
+    BasicDataRequest:
+      type: object
+      required:
+        - firstName
+        - firstSurName
+        - dateBirth
+        - email
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 50
+        othersName:
+          type: string
+        firstSurName:
+          type: string
+          minLength: 2
+          maxLength: 50
+        othersSurName:
+          type: string
+          maxLength: 100
+        dateBirth:
+          type: string
+          format: date
+        located:
+          type: string
+          maxLength: 100
+        locatedEng:
+          type: string
+          maxLength: 100
+        startWorkingDate:
+          type: string
+          format: date
+        greeting:
+          type: string
+          maxLength: 500
+        greetingEng:
+          type: string
+          maxLength: 500
+        email:
+          type: string
+          format: email
+        instagram:
+          type: string
+          maxLength: 100
+        linkedin:
+          type: string
+          maxLength: 200
+        x:
+          type: string
+          maxLength: 100
+        github:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        descriptionEng:
+          type: string
+        descriptionPdf:
+          type: array
+          items:
+            type: string
+        descriptionPdfEng:
+          type: array
+          items:
+            type: string
+        wrapper:
+          type: array
+          items:
+            type: string
+        wrapperEng:
+          type: array
+          items:
+            type: string
+
+    BasicDataResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        firstName:
+          type: string
+        othersName:
+          type: string
+        firstSurName:
+          type: string
+        othersSurName:
+          type: string
+        dateBirth:
+          type: string
+          format: date
+        located:
+          type: string
+        locatedEng:
+          type: string
+        startWorkingDate:
+          type: string
+          format: date
+        greeting:
+          type: string
+        greetingEng:
+          type: string
+        email:
+          type: string
+          format: email
+        instagram:
+          type: string
+        linkedin:
+          type: string
+        x:
+          type: string
+        github:
+          type: string
+        description:
+          type: string
+        descriptionEng:
+          type: string
+        descriptionPdf:
+          type: array
+          items:
+            type: string
+        descriptionPdfEng:
+          type: array
+          items:
+            type: string
+        wrapper:
+          type: array
+          items:
+            type: string
+        wrapperEng:
+          type: array
+          items:
+            type: string
+
+    ImageUrlRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+        - file
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        file:
+          type: string
+          minLength: 1
+
+    ImageUrlResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        url:
+          type: string
+
+    VideoUrlRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+        - url
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 255
+        url:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    VideoUrlResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        url:
+          type: string
+
+    LabelRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    LabelResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+
+    HomeRequest:
+      type: object
+      required:
+        - greeting
+        - greetingEng
+        - buttonWorkLabel
+        - buttonWorkLabelEng
+        - buttonContactLabel
+        - buttonContactLabelEng
+      properties:
+        greeting:
+          type: string
+          minLength: 1
+          maxLength: 200
+        greetingEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        imageUrlId:
+          type: integer
+          format: int64
+        buttonWorkLabel:
+          type: string
+          minLength: 1
+          maxLength: 50
+        buttonWorkLabelEng:
+          type: string
+          minLength: 1
+          maxLength: 50
+        buttonContactLabel:
+          type: string
+          minLength: 1
+          maxLength: 50
+        buttonContactLabelEng:
+          type: string
+          minLength: 1
+          maxLength: 50
+        labelIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    HomeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        greeting:
+          type: string
+        greetingEng:
+          type: string
+        imageUrl:
+          $ref: "#/components/schemas/ImageUrlResponse"
+        buttonWorkLabel:
+          type: string
+        buttonWorkLabelEng:
+          type: string
+        buttonContactLabel:
+          type: string
+        buttonContactLabelEng:
+          type: string
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelResponse"
+
+    BlogRequest:
+      type: object
+      required:
+        - title
+        - titleEng
+        - descriptionShort
+        - description
+        - descriptionShortEng
+        - descriptionEng
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        titleEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        cleanUrlTitle:
+          type: string
+          maxLength: 200
+        descriptionShort:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        descriptionShortEng:
+          type: string
+          minLength: 1
+          maxLength: 300
+        descriptionEng:
+          type: string
+          minLength: 1
+        imageUrlId:
+          type: integer
+          format: int64
+        videoUrlId:
+          type: integer
+          format: int64
+        blogTypeId:
+          type: integer
+          format: int64
+
+    BlogResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        titleEng:
+          type: string
+        cleanUrlTitle:
+          type: string
+        descriptionShort:
+          type: string
+        description:
+          type: string
+        descriptionShortEng:
+          type: string
+        descriptionEng:
+          type: string
+        imageUrl:
+          $ref: "#/components/schemas/ImageUrlResponse"
+        videoUrl:
+          $ref: "#/components/schemas/VideoUrlResponse"
+        blogType:
+          $ref: "#/components/schemas/BlogTypeResponse"
+
+    BlogPageResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogResponse"
+        pageable:
+          type: object
+          properties:
+            sort:
+              type: object
+              properties:
+                empty:
+                  type: boolean
+                sorted:
+                  type: boolean
+                unsorted:
+                  type: boolean
+            offset:
+              type: integer
+              format: int64
+            pageSize:
+              type: integer
+            pageNumber:
+              type: integer
+            paged:
+              type: boolean
+            unpaged:
+              type: boolean
+        last:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+        number:
+          type: integer
+        sort:
+          type: object
+          properties:
+            empty:
+              type: boolean
+            sorted:
+              type: boolean
+            unsorted:
+              type: boolean
+        first:
+          type: boolean
+        numberOfElements:
+          type: integer
+        empty:
+          type: boolean
+
+    BlogTypeRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    BlogTypeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+
+    SkillTypeRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        skillIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    SkillTypeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillResponse"
+
+    SkillRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        skillSonIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    SkillResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        skillSons:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillSonResponse"
+
+    SkillSonRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    SkillSonResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+
+    ExperienceRequest:
+      type: object
+      required:
+        - yearStart
+        - company
+        - description
+        - descriptionEng
+      properties:
+        yearStart:
+          type: string
+          format: date
+        yearEnd:
+          type: string
+          format: date
+        company:
+          type: string
+          minLength: 1
+          maxLength: 100
+        position:
+          type: string
+          minLength: 1
+          maxLength: 100
+        positionEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        location:
+          type: string
+          minLength: 1
+          maxLength: 100
+        locationEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        summary:
+          type: string
+          minLength: 1
+        summaryEng:
+          type: string
+          minLength: 1
+        summaryPdf:
+          type: string
+          minLength: 1
+        summaryPdfEng:
+          type: string
+          minLength: 1
+        descriptionItemsPdf:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        descriptionItemsPdfEng:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        skillSonIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    ExperienceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        yearStart:
+          type: string
+          format: date
+        yearEnd:
+          type: string
+          format: date
+        company:
+          type: string
+        location:
+          type: string
+        locationEng:
+          type: string
+        position:
+          type: string
+        positionEng:
+          type: string
+        summary:
+          type: string
+        summaryEng:
+          type: string
+        summaryPdf:
+          type: string
+        summaryPdfEng:
+          type: string
+        descriptionItemsPdf:
+          type: array
+          items:
+            type: string
+        descriptionItemsPdfEng:
+          type: array
+          items:
+            type: string
+        skillSons:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillSonResponse"
+
+    EducationRequest:
+      type: object
+      required:
+        - institution
+        - area
+        - areaEng
+        - degree
+        - degreeEng
+        - startDate
+        - location
+        - locationEng
+        - highlights
+        - highlightsEng
+      properties:
+        institution:
+          type: string
+          minLength: 1
+          maxLength: 100
+        area:
+          type: string
+          minLength: 1
+          maxLength: 100
+        areaEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        degree:
+          type: string
+          minLength: 1
+          maxLength: 100
+        degreeEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        location:
+          type: string
+          minLength: 1
+          maxLength: 100
+        locationEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        highlights:
+          type: array
+          items:
+            type: string
+        highlightsEng:
+          type: array
+          items:
+            type: string
+
+    EducationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        institution:
+          type: string
+        area:
+          type: string
+        areaEng:
+          type: string
+        degree:
+          type: string
+        degreeEng:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        location:
+          type: string
+        locationEng:
+          type: string
+        highlights:
+          type: array
+          items:
+            type: string
+        highlightsEng:
+          type: array
+          items:
+            type: string
+
+    FuturedProjectRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+        - experienceId
+        - descriptionShort
+        - description
+        - descriptionShortEng
+        - descriptionEng
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        experienceId:
+          type: integer
+          format: int64
+        descriptionShort:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        descriptionShortEng:
+          type: string
+          minLength: 1
+          maxLength: 300
+        descriptionEng:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        imageListUrlId:
+          type: integer
+          format: int64
+        imageUrlId:
+          type: integer
+          format: int64
+
+    FuturedProjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        descriptionShort:
+          type: string
+        description:
+          type: string
+        descriptionShortEng:
+          type: string
+        descriptionEng:
+          type: string
+        experience:
+          $ref: "#/components/schemas/ExperienceResponse"
+        imageListUrl:
+          $ref: "#/components/schemas/ImageUrlResponse"
+        imageUrl:
+          $ref: "#/components/schemas/ImageUrlResponse"
+
+    InfoPageResponse:
+      type: object
+      properties:
+        home:
+          $ref: "#/components/schemas/HomeResponse"
+        basicData:
+          $ref: "#/components/schemas/BasicDataResponse"
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillResponse"
+        experiences:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperienceResponse"
+        educations:
+          type: array
+          items:
+            $ref: "#/components/schemas/EducationResponse"
+        altchaChallenge:
+          $ref: "#/components/schemas/AltchaChallengeResponse"
+
+    # ==================== NEW ENTITY SCHEMAS ====================
+    CourseRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+        - institution
+        - institutionEng
+        - completionDate
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        institution:
+          type: string
+          minLength: 1
+          maxLength: 200
+        institutionEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        completionDate:
+          type: string
+          format: date
+        description:
+          type: string
+          description: HTML content for portal (ES)
+        descriptionEng:
+          type: string
+          description: HTML content for portal (EN)
+        summaryPdf:
+          type: string
+          description: Plain text for PDF (ES)
+        summaryPdfEng:
+          type: string
+          description: Plain text for PDF (EN)
+        certificateUrl:
+          type: string
+          maxLength: 500
+
+    CourseResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        institution:
+          type: string
+        institutionEng:
+          type: string
+        completionDate:
+          type: string
+          format: date
+        description:
+          type: string
+        descriptionEng:
+          type: string
+        summaryPdf:
+          type: string
+        summaryPdfEng:
+          type: string
+        certificateUrl:
+          type: string
+
+    CertificationRequest:
+      type: object
+      required:
+        - name
+        - nameEng
+        - issuingOrganization
+        - issuingOrganizationEng
+        - issueDate
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        nameEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        issuingOrganization:
+          type: string
+          minLength: 1
+          maxLength: 200
+        issuingOrganizationEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        issueDate:
+          type: string
+          format: date
+        expirationDate:
+          type: string
+          format: date
+        verificationUrl:
+          type: string
+          maxLength: 500
+        credentialId:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          description: HTML content for portal (ES)
+        descriptionEng:
+          type: string
+          description: HTML content for portal (EN)
+        summaryPdf:
+          type: string
+          description: Plain text for PDF (ES)
+        summaryPdfEng:
+          type: string
+          description: Plain text for PDF (EN)
+
+    CertificationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nameEng:
+          type: string
+        issuingOrganization:
+          type: string
+        issuingOrganizationEng:
+          type: string
+        issueDate:
+          type: string
+          format: date
+        expirationDate:
+          type: string
+          format: date
+        verificationUrl:
+          type: string
+        credentialId:
+          type: string
+        description:
+          type: string
+        descriptionEng:
+          type: string
+        summaryPdf:
+          type: string
+        summaryPdfEng:
+          type: string
+
+    LanguageRequest:
+      type: object
+      required:
+        - language
+        - languageEng
+        - readingLevel
+        - writingLevel
+        - speakingLevel
+      properties:
+        language:
+          type: string
+          minLength: 1
+          maxLength: 100
+        languageEng:
+          type: string
+          minLength: 1
+          maxLength: 100
+        readingLevel:
+          type: string
+          minLength: 1
+          maxLength: 50
+        writingLevel:
+          type: string
+          minLength: 1
+          maxLength: 50
+        speakingLevel:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    LanguageResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        language:
+          type: string
+        languageEng:
+          type: string
+        readingLevel:
+          type: string
+        writingLevel:
+          type: string
+        speakingLevel:
+          type: string
+
+    ReferenceRequest:
+      type: object
+      required:
+        - fullName
+        - position
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        position:
+          type: string
+          minLength: 1
+          maxLength: 200
+        company:
+          type: string
+          maxLength: 200
+        companyEng:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 30
+        relationship:
+          type: string
+          maxLength: 200
+        relationshipEng:
+          type: string
+          maxLength: 200
+
+    ReferenceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fullName:
+          type: string
+        position:
+          type: string
+        company:
+          type: string
+        companyEng:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        relationship:
+          type: string
+        relationshipEng:
+          type: string
+
+    CustomSectionRequest:
+      type: object
+      required:
+        - title
+        - titleEng
+        - visible
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        titleEng:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          description: HTML content for portal (ES)
+        contentEng:
+          type: string
+          description: HTML content for portal (EN)
+        summaryPdf:
+          type: string
+          description: Plain text for PDF (ES)
+        summaryPdfEng:
+          type: string
+          description: Plain text for PDF (EN)
+        visible:
+          type: boolean
+          description: Whether this section is visible in public endpoints
+
+    CustomSectionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        titleEng:
+          type: string
+        content:
+          type: string
+        contentEng:
+          type: string
+        summaryPdf:
+          type: string
+        summaryPdfEng:
+          type: string
+        visible:
+          type: boolean
+
+    # ==================== COMMON SCHEMAS ====================
+    CreateResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - version
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+
+    # ==================== ERROR SCHEMAS ====================
+    ApiErrorResponse:
+      type: object
+      required:
+        - timestamp
+        - status
+        - error
+        - code
+        - message
+        - path
+        - trace_id
+        - details
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        error:
+          type: string
+        code:
+          type: string
+          description: Stable error code
+        message:
+          type: string
+        path:
+          type: string
+        trace_id:
+          type: string
+          format: uuid
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiErrorDetail"
+
+    ApiErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        rejected_value: {}
+
+  responses:
+    BadRequest:
+      description: Solicitud incorrecta - Error de validación
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    Unauthorized:
+      description: No autenticado o token inválido/expirado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    Conflict:
+      description: Conflicto - recurso duplicado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    RateLimitExceeded:
+      description: Límite de requests excedido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    ServiceUnavailable:
+      description: Servicio dependiente no disponible
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+    InternalServerError:
+      description: Error interno del servidor
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer Token obtenido vía POST /v1/ms-resume/login
+
+security:
+  - BearerAuth: []
