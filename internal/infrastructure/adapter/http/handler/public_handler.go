@@ -130,8 +130,8 @@ func (h *PublicHandler) GetCurriculum(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, reader)
 }
 
-// GetContact handles POST /v1/ms-resume/public/contact
-func (h *PublicHandler) GetContact(w http.ResponseWriter, r *http.Request) {
+// SubmitContact handles POST /v1/ms-resume/public/contact
+func (h *PublicHandler) SubmitContact(w http.ResponseWriter, r *http.Request) {
 	var req ContactRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, r, http.StatusBadRequest, "INVALID_JSON", "Invalid request body")
@@ -157,7 +157,7 @@ func (h *PublicHandler) GetContact(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.contactUseCase.SubmitContact(r.Context(), req.Name, req.Email, req.Message, req.Altcha); err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+		WriteError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "The request could not be processed")
 		return
 	}
 

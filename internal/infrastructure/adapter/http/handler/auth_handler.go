@@ -8,26 +8,25 @@ import (
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/dto/request"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/input"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/output"
-	"github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/middleware"
 )
 
 // AuthHandler handles authentication HTTP requests.
 type AuthHandler struct {
 	authUseCase  input.AuthUseCase
 	altchaPort   output.AltchaPort
-	jwtService   *middleware.JWTService
+	jwtPort      output.JWTTokenPort
 }
 
 // NewAuthHandler creates a new AuthHandler.
 func NewAuthHandler(
 	authUseCase input.AuthUseCase,
 	altchaPort output.AltchaPort,
-	jwtService *middleware.JWTService,
+	jwtPort output.JWTTokenPort,
 ) *AuthHandler {
 	return &AuthHandler{
 		authUseCase:  authUseCase,
 		altchaPort:   altchaPort,
-		jwtService:   jwtService,
+		jwtPort:      jwtPort,
 	}
 }
 

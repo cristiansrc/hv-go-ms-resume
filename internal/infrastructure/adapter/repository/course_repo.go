@@ -48,7 +48,7 @@ func (r *CourseRepo) GetByID(ctx context.Context, id int64) (*entity.Course, err
 		&e.CompletionDate, &e.Description, &e.DescriptionEng, &e.SummaryPdf, &e.SummaryPdfEng,
 		&e.CertificateURL, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("course not found")
+		return nil, fmt.Errorf("course: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

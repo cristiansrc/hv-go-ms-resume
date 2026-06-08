@@ -173,6 +173,97 @@ func (s *PdfService) collectCvData(ctx context.Context, language string) (*outpu
 		cvData.Headline = s.getLocalizedString(basicData.Wrapper, basicData.WrapperEng, language)
 	}
 
+	// Courses
+	courses, err := s.courseRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get courses: %w", err)
+	}
+	courseItems := make([]output.CVSectionItem, len(courses))
+	for i, c := range courses {
+		courseItems[i] = output.CVSectionItem{
+			Title:       s.getLocalizedString(&c.Name, &c.NameEng, language),
+			Subtitle:    s.getLocalizedString(&c.Institution, &c.InstitutionEng, language),
+			Date:        c.CompletionDate,
+			Description: s.getLocalizedString(c.Description, c.DescriptionEng, language),
+		}
+	}
+	cvData.Sections["courses"] = []output.CVSection{
+		{Name: "Courses", Items: courseItems},
+	}
+
+	// Certifications
+	certifications, err := s.certificationRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certifications: %w", err)
+	}
+	certItems := make([]output.CVSectionItem, len(certifications))
+	for i, c := range certifications {
+		certItems[i] = output.CVSectionItem{
+			Title:       s.getLocalizedString(&c.Name, &c.NameEng, language),
+			Subtitle:    s.getLocalizedString(&c.IssuingOrganization, &c.IssuingOrganizationEng, language),
+			Date:        c.IssueDate,
+			Description: s.getLocalizedString(c.Description, c.DescriptionEng, language),
+		}
+	}
+	cvData.Sections["certifications"] = []output.CVSection{
+		{Name: "Certifications", Items: certItems},
+	}
+
+	// Languages
+	languages, err := s.languageRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get languages: %w", err)
+	}
+	langItems := make([]output.CVSectionItem, len(languages))
+	for i, l := range languages {
+		langItems[i] = output.CVSectionItem{
+			Title:       s.getLocalizedString(&l.Language, &l.LanguageEng, language),
+			Description: fmt.Sprintf("Reading: %s, Writing: %s, Speaking: %s", l.ReadingLevel, l.WritingLevel, l.SpeakingLevel),
+		}
+	}
+	cvData.Sections["languages"] = []output.CVSection{
+		{Name: "Languages", Items: langItems},
+	}
+
+	// References
+	references, err := s.referenceRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get references: %w", err)
+	}
+	refItems := make([]output.CVSectionItem, len(references))
+	for i, r := range references {
+		refItems[i] = output.CVSectionItem{
+			Title:       r.FullName,
+			Subtitle:    r.Position,
+			Description: s.getLocalizedString(r.Company, r.CompanyEng, language),
+		}
+	}
+	cvData.Sections["references"] = []output.CVSection{
+		{Name: "References", Items: refItems},
+	}
+
+	// CustomSections (only visible)
+	allCustomSections, err := s.customSectionRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get custom sections: %w", err)
+	}
+	var visibleSections []entity.CustomSection
+	for _, cs := range allCustomSections {
+		if cs.Visible {
+			visibleSections = append(visibleSections, cs)
+		}
+	}
+	csItems := make([]output.CVSectionItem, len(visibleSections))
+	for i, cs := range visibleSections {
+		csItems[i] = output.CVSectionItem{
+			Title:       s.getLocalizedString(&cs.Title, &cs.TitleEng, language),
+			Description: s.getLocalizedString(cs.Content, cs.ContentEng, language),
+		}
+	}
+	cvData.Sections["custom_sections"] = []output.CVSection{
+		{Name: "Custom Sections", Items: csItems},
+	}
+
 	return cvData, nil
 }
 

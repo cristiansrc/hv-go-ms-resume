@@ -50,7 +50,7 @@ func (r *FuturedProjectRepo) GetByID(ctx context.Context, id int64) (*entity.Fut
 		&e.ImageListURLID, &e.ImageURLID, &e.Order,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("futured_project not found")
+		return nil, fmt.Errorf("futured_project: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

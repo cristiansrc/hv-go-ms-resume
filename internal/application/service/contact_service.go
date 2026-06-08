@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/input"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/output"
 )
+
+// ErrInvalidAltcha is a sentinel error for invalid altcha solution.
+var ErrInvalidAltcha = errors.New("invalid altcha solution")
 
 // ContactService implements the ContactUseCase interface.
 type ContactService struct {
@@ -32,7 +36,7 @@ func NewContactService(
 // SubmitContact validates the Altcha challenge and sends a Telegram notification.
 func (s *ContactService) SubmitContact(ctx context.Context, name, email, message, altcha string) error {
 	if !s.altchaPort.ValidateSolution(altcha) {
-		return fmt.Errorf("invalid altcha solution")
+		return ErrInvalidAltcha
 	}
 
 	telegramMessage := fmt.Sprintf(

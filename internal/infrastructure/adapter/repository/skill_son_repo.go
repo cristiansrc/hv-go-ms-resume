@@ -64,7 +64,7 @@ func (r *SkillSonRepo) GetByID(ctx context.Context, id int64) (*entity.SkillSon,
 	var e entity.SkillSon
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("skill_son not found")
+		return nil, fmt.Errorf("skill_son: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

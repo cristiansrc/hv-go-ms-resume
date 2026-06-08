@@ -2,13 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/dto/request"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/input"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/domain/entity"
 )
 
 // ImageUrlHandler handles HTTP requests for the ImageUrl entity.
@@ -43,7 +44,7 @@ func (h *ImageUrlHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.useCase.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Image URL not found")
 			return
 		}
@@ -58,8 +59,7 @@ func (h *ImageUrlHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // Create handles POST /v1/ms-resume/image-urls
 func (h *ImageUrlHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.ImageURLRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_JSON", "Invalid request body")
+	if !decodeAndValidate(w, r, &req) {
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *ImageUrlHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.useCase.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Image URL not found")
 			return
 		}

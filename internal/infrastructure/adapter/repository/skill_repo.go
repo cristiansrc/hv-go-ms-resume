@@ -42,7 +42,7 @@ func (r *SkillRepo) GetByID(ctx context.Context, id int64) (*entity.Skill, error
 	var e entity.Skill
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("skill not found")
+		return nil, fmt.Errorf("skill: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

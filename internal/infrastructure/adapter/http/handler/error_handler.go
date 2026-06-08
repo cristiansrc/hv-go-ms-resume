@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/middleware"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/ctxkeys"
 )
 
 // ApiErrorResponse represents the standard API error response.
@@ -30,7 +30,7 @@ type ApiErrorDetail struct {
 // WriteError sends a standardized JSON error response.
 func WriteError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
 	traceID := ""
-	if rid, ok := r.Context().Value(middleware.RequestIDKey).(string); ok {
+	if rid, ok := r.Context().Value(ctxkeys.RequestIDKey).(string); ok {
 		traceID = rid
 	}
 
@@ -52,7 +52,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, status int, code, messag
 // WriteValidationError sends a standardized validation error response.
 func WriteValidationError(w http.ResponseWriter, r *http.Request, details []ApiErrorDetail) {
 	traceID := ""
-	if rid, ok := r.Context().Value(middleware.RequestIDKey).(string); ok {
+	if rid, ok := r.Context().Value(ctxkeys.RequestIDKey).(string); ok {
 		traceID = rid
 	}
 

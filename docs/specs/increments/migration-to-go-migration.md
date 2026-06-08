@@ -1,6 +1,6 @@
 # Migration Contract - migration-to-go
 
-**Status**: `awaiting-human-plan-approval`
+**Status**: `approved`
 **Fecha**: 2026-05-31
 **Incremento**: `migration-to-go`
 

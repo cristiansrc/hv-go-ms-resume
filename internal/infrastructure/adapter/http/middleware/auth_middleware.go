@@ -2,10 +2,10 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
+
+	handler "github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/handler"
 )
 
 type contextKey string
@@ -52,23 +52,5 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 }
 
 func writeUnauthorized(w http.ResponseWriter, r *http.Request, message string) {
-	requestID := ""
-	if rid, ok := r.Context().Value(RequestIDKey).(string); ok {
-		requestID = rid
-	}
-
-	resp := map[string]interface{}{
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"status":    http.StatusUnauthorized,
-		"error":     "Unauthorized",
-		"code":      "UNAUTHORIZED",
-		"message":   message,
-		"path":      r.URL.Path,
-		"trace_id":  requestID,
-		"details":   nil,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(resp)
+	handler.WriteError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", message)
 }

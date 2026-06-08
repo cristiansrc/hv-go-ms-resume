@@ -27,6 +27,7 @@ type PublicService struct {
 	customSectionRepo  output.CustomSectionRepository
 	skillRepo          output.SkillRepository
 	skillSonRepo       output.SkillSonRepository
+	videoUrlRepo       output.VideoUrlRepository
 	altchaPort         output.AltchaPort
 }
 
@@ -47,6 +48,7 @@ func NewPublicService(
 	customSectionRepo output.CustomSectionRepository,
 	skillRepo output.SkillRepository,
 	skillSonRepo output.SkillSonRepository,
+	videoUrlRepo output.VideoUrlRepository,
 	altchaPort output.AltchaPort,
 ) input.PublicUseCase {
 	return &PublicService{
@@ -65,6 +67,7 @@ func NewPublicService(
 		customSectionRepo: customSectionRepo,
 		skillRepo:         skillRepo,
 		skillSonRepo:      skillSonRepo,
+		videoUrlRepo:      videoUrlRepo,
 		altchaPort:        altchaPort,
 	}
 }
@@ -158,12 +161,73 @@ func (s *PublicService) GetInfoPage(ctx context.Context) (*response.InfoPageResp
 		eduResponses[i] = *mapped
 	}
 
+	// Courses
+	courses, err := s.courseRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	courseResponses := make([]response.CourseResponse, len(courses))
+	for i, c := range courses {
+		courseResponses[i] = *mapCourseToResponse(&c)
+	}
+
+	// Certifications
+	certifications, err := s.certificationRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	certificationResponses := make([]response.CertificationResponse, len(certifications))
+	for i, c := range certifications {
+		certificationResponses[i] = *mapCertificationToResponse(&c)
+	}
+
+	// Languages
+	languages, err := s.languageRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	languageResponses := make([]response.LanguageResponse, len(languages))
+	for i, l := range languages {
+		languageResponses[i] = *mapLanguageToResponse(&l)
+	}
+
+	// References
+	references, err := s.referenceRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	referenceResponses := make([]response.ReferenceResponse, len(references))
+	for i, r := range references {
+		referenceResponses[i] = *mapReferenceToResponse(&r)
+	}
+
+	// CustomSections (only visible)
+	allCustomSections, err := s.customSectionRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var visibleCustomSections []entity.CustomSection
+	for _, cs := range allCustomSections {
+		if cs.Visible {
+			visibleCustomSections = append(visibleCustomSections, cs)
+		}
+	}
+	customSectionResponses := make([]response.CustomSectionResponse, len(visibleCustomSections))
+	for i, cs := range visibleCustomSections {
+		customSectionResponses[i] = *mapCustomSectionToResponse(&cs)
+	}
+
 	return &response.InfoPageResponse{
 		Home:      homeResp,
 		BasicData: mapBasicDataToResponse(basicData),
 		Skills:    skillResponses,
-		Experiences: expResponses,
-		Educations:  eduResponses,
+		Experiences:    expResponses,
+		Educations:     eduResponses,
+		Courses:        courseResponses,
+		Certifications: certificationResponses,
+		Languages:      languageResponses,
+		References:     referenceResponses,
+		CustomSections: customSectionResponses,
 		AltchaChallenge: &response.AltchaChallengeResponse{
 			Algorithm: altchaChallenge.Algorithm,
 			Challenge: altchaChallenge.Challenge,
@@ -380,7 +444,18 @@ func (s *PublicService) mapBlogToResponse(ctx context.Context, e *entity.Blog) (
 		}
 	}
 
-	// VideoURL is not resolved as VideoUrlRepository is not available
+	// Resolve VideoURL if present
+	if e.VideoURLID != nil {
+		vid, err := s.videoUrlRepo.GetByID(ctx, *e.VideoURLID)
+		if err == nil {
+			resp.VideoURL = &response.VideoUrlResponse{
+				ID:      vid.ID,
+				Name:    vid.Name,
+				NameEng: vid.NameEng,
+				URL:     vid.URL,
+			}
+		}
+	}
 
 	return resp, nil
 }

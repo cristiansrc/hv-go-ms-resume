@@ -42,7 +42,7 @@ func (r *SkillTypeRepo) GetByID(ctx context.Context, id int64) (*entity.SkillTyp
 	var e entity.SkillType
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("skill_type not found")
+		return nil, fmt.Errorf("skill_type: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

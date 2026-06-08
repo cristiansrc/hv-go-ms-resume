@@ -102,5 +102,7 @@ func mapCustomSectionToResponse(e *entity.CustomSection) *response.CustomSection
 		SummaryPdf:    e.SummaryPdf,
 		SummaryPdfEng: e.SummaryPdfEng,
 		Visible:       e.Visible,
+		CreatedAt:     e.CreatedAt,
+		UpdatedAt:     e.UpdatedAt,
 	}
 }

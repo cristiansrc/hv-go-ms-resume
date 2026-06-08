@@ -156,7 +156,7 @@ func scanBasicData(row *sql.Row) (*entity.BasicData, error) {
 		&e.DescriptionPdf, &e.DescriptionPdfEng, &e.Wrapper, &e.WrapperEng,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("basic_data not found")
+		return nil, fmt.Errorf("basic_data: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -177,7 +177,7 @@ func (r *HomeRepo) GetByID(ctx context.Context, id int64) (*entity.Home, error) 
 		&e.ButtonWorkLabel, &e.ButtonWorkLabelEng, &e.ButtonContactLabel, &e.ButtonContactLabelEng,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("home not found")
+		return nil, fmt.Errorf("home: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -244,7 +244,7 @@ func scanLabel(row *sql.Row) (*entity.Label, error) {
 	var e entity.Label
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("label not found")
+		return nil, fmt.Errorf("label: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -293,7 +293,7 @@ func (r *ImageUrlRepo) GetByID(ctx context.Context, id int64) (*entity.ImageUrl,
 	var e entity.ImageUrl
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.URL, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("image_url not found")
+		return nil, fmt.Errorf("image_url: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -346,7 +346,7 @@ func (r *VideoUrlRepo) GetByID(ctx context.Context, id int64) (*entity.VideoUrl,
 	var e entity.VideoUrl
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.URL, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("video_url not found")
+		return nil, fmt.Errorf("video_url: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -425,7 +425,7 @@ func (r *BlogRepo) GetByID(ctx context.Context, id int64) (*entity.Blog, error) 
 		&e.ImageURLID, &e.VideoURLID, &e.BlogTypeID,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("blog not found")
+		return nil, fmt.Errorf("blog: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -510,7 +510,7 @@ func (r *ExperienceRepo) GetByID(ctx context.Context, id int64) (*entity.Experie
 		&e.DescriptionItemsPdf, &e.DescriptionItemsPdfEng,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("experience not found")
+		return nil, fmt.Errorf("experience: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
@@ -563,7 +563,7 @@ func (r *UserCredentialsRepo) GetByUsername(ctx context.Context, username string
 	var e entity.UserCredentials
 	err := row.Scan(&e.ID, &e.Username, &e.PasswordHash, &e.CreatedAt, &e.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

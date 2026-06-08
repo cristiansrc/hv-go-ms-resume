@@ -1,15 +1,15 @@
 # Shared Context - migration-to-go
 
 **Increment**: `migration-to-go`
-**Status**: `awaiting-human-plan-approval`
+**Status**: `human-approved`
 **Created**: 2026-05-31
-**Last Updated**: 2026-05-31
+**Last Updated**: 2026-06-04
 
 ---
 
 ## Current status
 
-`awaiting-human-plan-approval` - Spec Validator ha emitido `verdict: ready`. Pendiente aprobación humana del plan.
+`human-approved` - Plan aprobado por el usuario (cristiansrc) el 2026-06-04. Migration Contract y Master Spec aprobados. Listo para Task Decomposer.
 
 ---
 
@@ -79,8 +79,9 @@ invalidated_by_changes_since: none
 
 ## Human Plan Approval: approved_by_user
 
-_approved_at_: 2026-05-31
+_approved_at_: 2026-06-04 (re-confirmado)
 _approved_by_: cristiansrc
+_nota_: Usuario confirmó "apruebo la migracion" — Migration Contract y artefactos asociados aprobados para implementación.
 
 ---
 
@@ -154,7 +155,8 @@ Los siguientes términos NO deben usarse en este incremento:
 
 ## Next action
 
-1. **Spec Validator**: Re-validación completada con `verdict: ready` (1 hallazgo low pendiente: N-001)
-2. **Planner**: Corregir N-001 (conteo de ops Label y total protegidos en Artifact evidence) antes del handoff
-3. **Awaiting Human Plan Approval**: Usuario debe aprobar el plan para que Task Decomposer proceda
-4. Tras aprobación humana (`## Human Plan Approval: approved_by_user`), **Task Decomposer** crea el task board
+1. ✅ **Spec Validator**: Re-validación completada con `verdict: ready`
+2. ✅ **Planner**: N-001 corregido (conteo de ops Label = 5, total protegidos = 82)
+3. ✅ **Human Plan Approval**: Aprobado por cristiansrc el 2026-06-04
+4. **⏳ Task Decomposer**: Crear task board para implementación de migración de BD
+5. **⏳ Executor**: Ejecutar migración y validar datos

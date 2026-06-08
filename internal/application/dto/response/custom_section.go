@@ -10,4 +10,6 @@ type CustomSectionResponse struct {
 	SummaryPdf    *string `json:"summaryPdf,omitempty"`
 	SummaryPdfEng *string `json:"summaryPdfEng,omitempty"`
 	Visible       bool    `json:"visible"`
+	CreatedAt     string  `json:"createdAt"`
+	UpdatedAt     string  `json:"updatedAt"`
 }

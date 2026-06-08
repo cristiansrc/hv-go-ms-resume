@@ -51,7 +51,7 @@ func (r *CustomSectionRepo) GetByID(ctx context.Context, id int64) (*entity.Cust
 		&e.SummaryPdf, &e.SummaryPdfEng, &e.Order, &visible,
 		&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("custom_section not found")
+		return nil, fmt.Errorf("custom_section: %w", entity.ErrNotFound)
 	}
 	e.Visible = visible == 1
 	return &e, err

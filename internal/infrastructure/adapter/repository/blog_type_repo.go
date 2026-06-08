@@ -42,7 +42,7 @@ func (r *BlogTypeRepo) GetByID(ctx context.Context, id int64) (*entity.BlogType,
 	var e entity.BlogType
 	err := row.Scan(&e.ID, &e.Name, &e.NameEng, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("blog_type not found")
+		return nil, fmt.Errorf("blog_type: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

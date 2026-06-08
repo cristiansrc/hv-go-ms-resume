@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/output"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/service"
@@ -142,6 +144,7 @@ func main() {
 		repos.customSection,
 		repos.skill,
 		repos.skillSon,
+		repos.videoUrl,
 		altchaProvider,
 	)
 
@@ -231,7 +234,11 @@ func main() {
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		logger.Info("shutting down server...")
-		server.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Error("server shutdown error", "error", err)
+		}
 	}()
 
 	logger.Info("server listening", "addr", server.Addr)

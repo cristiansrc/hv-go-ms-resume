@@ -2,13 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/dto/request"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/input"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/domain/entity"
 )
 
 // BasicDataHandler handles HTTP requests for the BasicData entity.
@@ -31,7 +32,7 @@ func (h *BasicDataHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.useCase.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Basic data not found")
 			return
 		}
@@ -52,8 +53,7 @@ func (h *BasicDataHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req request.BasicDataRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_JSON", "Invalid request body")
+	if !decodeAndValidate(w, r, &req) {
 		return
 	}
 

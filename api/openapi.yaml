@@ -55,7 +55,7 @@ paths:
     get:
       operationId: getInfoPage
       summary: Obtener información completa de la página
-      description: Retorna Home, BasicData, Skills (lista plana), Experiences, Educations y Altcha Challenge.
+      description: Retorna Home, BasicData, Skills (lista plana), Experiences, Educations, Courses, Certifications, Languages, References, CustomSections y Altcha Challenge.
       tags:
         - Public
       security: []
@@ -3407,6 +3407,26 @@ components:
             $ref: "#/components/schemas/EducationResponse"
         altchaChallenge:
           $ref: "#/components/schemas/AltchaChallengeResponse"
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseResponse"
+        certifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/CertificationResponse"
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/LanguageResponse"
+        references:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferenceResponse"
+        customSections:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomSectionResponse"
 
     # ==================== NEW ENTITY SCHEMAS ====================
     CourseRequest:

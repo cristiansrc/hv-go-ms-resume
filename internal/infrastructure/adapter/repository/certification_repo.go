@@ -52,7 +52,7 @@ func (r *CertificationRepo) GetByID(ctx context.Context, id int64) (*entity.Cert
 		&e.Description, &e.DescriptionEng, &e.SummaryPdf, &e.SummaryPdfEng,
 		&e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("certification not found")
+		return nil, fmt.Errorf("certification: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

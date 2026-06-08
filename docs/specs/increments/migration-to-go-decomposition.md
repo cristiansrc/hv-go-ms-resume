@@ -1,6 +1,6 @@
 # Decomposition Contract - migration-to-go
 
-**Status**: `planning`
+**Status**: `superseded`
 **Increment**: `migration-to-go`
 **Fecha**: 2026-05-31
 

@@ -64,7 +64,7 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 
 			r.Get("/public/info-page", cfg.PublicHandler.GetInfoPage)
 			r.Get("/public/curriculum/{language}", cfg.PublicHandler.GetCurriculum)
-			r.Post("/public/contact", cfg.PublicHandler.GetContact)
+			r.Post("/public/contact", cfg.PublicHandler.SubmitContact)
 			r.Get("/public/challenge", cfg.PublicHandler.GetChallenge)
 			r.Get("/public/blog", cfg.PublicHandler.GetPublicBlog)
 			r.Get("/public/blog/{id}", cfg.PublicHandler.GetPublicBlogByID)

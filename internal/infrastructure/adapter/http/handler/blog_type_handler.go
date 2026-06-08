@@ -2,13 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/dto/request"
 	"github.com/cristiansrc/hv-go-ms-resume/internal/application/port/input"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/domain/entity"
 )
 
 // BlogTypeHandler handles HTTP requests for the BlogType entity.
@@ -43,7 +44,7 @@ func (h *BlogTypeHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.useCase.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Blog type not found")
 			return
 		}
@@ -58,8 +59,7 @@ func (h *BlogTypeHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // Create handles POST /v1/ms-resume/blog-types
 func (h *BlogTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.BlogTypeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_JSON", "Invalid request body")
+	if !decodeAndValidate(w, r, &req) {
 		return
 	}
 
@@ -83,13 +83,12 @@ func (h *BlogTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req request.BlogTypeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_JSON", "Invalid request body")
+	if !decodeAndValidate(w, r, &req) {
 		return
 	}
 
 	if err := h.useCase.Update(r.Context(), id, &req); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Blog type not found")
 			return
 		}
@@ -109,7 +108,7 @@ func (h *BlogTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.useCase.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, entity.ErrNotFound) {
 			WriteError(w, r, http.StatusNotFound, "NOT_FOUND", "Blog type not found")
 			return
 		}

@@ -5,13 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-)
-
-type requestIDKey string
-
-const (
-	// RequestIDKey is the context key for the request ID.
-	RequestIDKey requestIDKey = "request_id"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/ctxkeys"
 )
 
 // RequestIDMiddleware adds a unique request ID to each request.
@@ -31,7 +25,7 @@ func (m *RequestIDMiddleware) AttachRequestID(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("X-Request-ID", requestID)
-		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
+		ctx := context.WithValue(r.Context(), ctxkeys.RequestIDKey, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

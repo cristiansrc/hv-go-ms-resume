@@ -48,7 +48,7 @@ func (r *ReferenceRepo) GetByID(ctx context.Context, id int64) (*entity.Referenc
 		&e.Email, &e.Phone, &e.Relationship, &e.RelationshipEng,
 		&e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("reference not found")
+		return nil, fmt.Errorf("reference: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }

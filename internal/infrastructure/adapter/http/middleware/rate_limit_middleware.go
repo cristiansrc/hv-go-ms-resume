@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+	"github.com/cristiansrc/hv-go-ms-resume/internal/infrastructure/adapter/http/ctxkeys"
 )
 
 // rateLimitErrorResponse represents a rate limit error response.
@@ -105,7 +106,7 @@ func (m *RateLimitMiddleware) RateLimit(rateType string) func(http.Handler) http
 			limiter := m.getClient(key, ratePerMin)
 			if !limiter.Allow() {
 				traceID := ""
-				if rid, ok := r.Context().Value(RequestIDKey).(string); ok {
+				if rid, ok := r.Context().Value(ctxkeys.RequestIDKey).(string); ok {
 					traceID = rid
 				}
 				resp := rateLimitErrorResponse{

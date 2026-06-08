@@ -44,7 +44,7 @@ func (r *LanguageRepo) GetByID(ctx context.Context, id int64) (*entity.Language,
 	err := row.Scan(&e.ID, &e.Language, &e.LanguageEng, &e.ReadingLevel, &e.WritingLevel,
 		&e.SpeakingLevel, &e.Order, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("language not found")
+		return nil, fmt.Errorf("language: %w", entity.ErrNotFound)
 	}
 	return &e, err
 }
